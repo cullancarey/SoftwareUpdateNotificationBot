@@ -7,14 +7,15 @@ import os
 from db import *
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+from datetime import datetime
 load_dotenv()
 
 def compare_lists(release_list, db_list, conn, release_statments, slack_client, twitter_client):
-	no_updates_msg = 'No new releases at this time.'
-	iOS_msg = f'iOS release available! \n{release_statments[0]}'
-	macOS_msg = f'macOS release available! \n{release_statments[1]}'
-	tv_os_msg = f'tvOS release available! \n{release_statments[2]}'
-	watchOS_msg = f'watchOS release available! \n{release_statments[3]}'
+	no_updates_msg = f'{datetime.now()} \nNo new releases at this time. \n#iOS #macOS #tvOS #watchOS #apple'
+	iOS_msg = f'{datetime.now()} \niOS release available! \n{release_statments[0]} \n#iOS #apple'
+	macOS_msg = f'{datetime.now()} \nmacOS release available! \n{release_statments[1]} \n#macOS #apple'
+	tv_os_msg = f'{datetime.now()} \ntvOS release available! \n{release_statments[2]} \n#tvOS #apple'
+	watchOS_msg = f'{datetime.now()} \nwatchOS release available! \n{release_statments[3]} \n#watchOS #apple'
 	if release_list == db_list:
 		send_slack_message(slack_client, no_updates_msg)
 		twitter_client.update_status(no_updates_msg)
