@@ -1,4 +1,5 @@
 import requests
+import tweepy
 from bs4 import BeautifulSoup
 import re
 from dotenv import load_dotenv
@@ -8,20 +9,30 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 load_dotenv()
 
-def compare_lists(release_list, db_list, conn, release_statments, client):
+def compare_lists(release_list, db_list, conn, release_statments, slack_client, twitter_client):
+	no_updates_msg = 'No new releases at this time.'
+	iOS_msg = f'iOS release available! \n{release_statments[0]}'
+	macOS_msg = f'macOS release available! \n{release_statments[1]}'
+	tv_os_msg = f'tvOS release available! \n{release_statments[2]}'
+	watchOS_msg = f'watchOS release available! \n{release_statments[3]}'
 	if release_list == db_list:
-		send_slack_message(client, 'No new releases at this time.')
+		send_slack_message(slack_client, no_updates_msg)
+		twitter_client.update_status(no_updates_msg)
 	if release_list[0] != db_list[0]:
-		send_slack_message(client, f'iOS release available! \n{release_statments[0]}')
+		send_slack_message(slack_client, iOS_msg)
+		twitter_client.update_status(iOS_msg)
 		db.sql_insert(conn, release_list)
 	if release_list[1] != db_list[1]:
-		send_slack_message(client, f'macOS release available! \n{release_statments[1]}')
+		send_slack_message(slack_client, macOS_msg)
+		twitter_client.update_status(macOS_msg)
 		db.sql_insert(conn, release_list)
 	if release_list[2] != db_list[2]:
-		send_slack_message(client, f'tvOS release available! \n{release_statments[2]}')
+		send_slack_message(slack_client, tv_os_msg)
+		twitter_client.update_status(tv_os_msg)
 		db.sql_insert(conn, release_list)
 	if release_list[3] != db_list[3]:
-		send_slack_message(client, f'watchOS release available! \n{release_statments[3]}')
+		send_slack_message(slack_client, watchOS_msg)
+		twitter_client.update_status(watchOS_msg)
 		db.sql_insert(conn, release_list)
 
 def send_slack_message(client, message):
@@ -42,18 +53,32 @@ release_statments = []
 for i in results:
 	if "The latest version" in i.text:
 		s = i.text.replace(" ", " ")
-		group = re.search("^.*?[.!?](?:\\s|$)(?!.*\\))", s)
+		group = re.search("^.*?[.!?](?:\\s|$)(?!.*?\\))", s)
 		group = group.group(0)
 		release_statments.append(group)
 
 releases = []
 for i in release_statments:
-	x = re.findall(r'\d+\.\d+', i)
-	for l in x:
-		releases.append(float(l))
+	y = re.findall(r'[\d\.]+', i)
+	for x in y:
+		print(x)
+		releases.append(x[0:-1])
 
 #Sets Slack client
-client = WebClient(token=os.environ['SLACK_BOT_USER_OAUTH'])
+slack_client = WebClient(token=os.environ['SLACK_BOT_USER_OAUTH'])
+
+#Set Twitter client 
+CLIENT_ID = os.environ['API_KEY']
+ACCESS_TOKEN = os.environ['ACCESS_TOKEN']
+ACCESS_TOKEN_SECRET = os.environ['ACCESS_TOKEN_SECRET']
+CLIENT_SECRET = os.environ['SECRET_KEY']
+
+# Authenticate to Twitter
+auth = tweepy.OAuthHandler(f"{CLIENT_ID}", f"{CLIENT_SECRET}")
+auth.set_access_token(f"{ACCESS_TOKEN}", f"{ACCESS_TOKEN_SECRET}")
+
+# Create API object
+twitter_client = tweepy.API(auth)
 
 #Create db and make sure 
 #'releases' table exists
@@ -67,13 +92,13 @@ row_list = db.sql_select(conn)
 for i in row_list:
 	row_list = list(i)
 row_list = row_list[1:5]
-print(row_list)
-print(releases)
+print(f"DB list: {row_list}")
+print(f"Website list: {releases}")
 if row_list:
 	db.sql_select(conn)
 else:
 	db.sql_insert(conn, releases)
-	# print(db.sql_select(conn))
+	print(db.sql_select(conn))
 # releases = [15.2, 12.1, 15.2, 8.3]
-compare_lists(releases, row_list, conn, release_statments, client)
+compare_lists(releases, row_list, conn, release_statments, slack_client, twitter_client)
 
